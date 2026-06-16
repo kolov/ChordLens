@@ -551,45 +551,6 @@ h1 {
   font-size: 8px;
 }
 
-.string-notes {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.string-note {
-  display: grid;
-  justify-items: center;
-  min-height: 46px;
-  padding: 5px 3px;
-  border: 1px solid var(--line);
-  border-top: 3px solid currentColor;
-  border-radius: 7px;
-  background: #ffffff;
-  color: var(--ink);
-}
-
-.string-note span,
-.string-note em {
-  color: var(--muted);
-  font-size: 0.58rem;
-  font-style: normal;
-  font-weight: 850;
-}
-
-.string-note strong {
-  min-width: 0;
-  max-width: 100%;
-  color: var(--ink);
-  font-size: 0.78rem;
-  line-height: 1;
-  overflow-wrap: anywhere;
-}
-
-.string-note.muted {
-  color: #9aa5aa;
-}
-
 @media (max-width: 920px) {
   .app-shell {
     grid-template-columns: 1fr;

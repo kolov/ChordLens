@@ -1,4 +1,4 @@
-# Verbose Chords
+# ChordLens
 
 A pure browser TypeScript app for visualising guitar chord shapes and the notes inside each voicing.
 

@@ -312,8 +312,8 @@ app.innerHTML = `
   <main class="app-shell">
     <section class="control-panel" aria-labelledby="app-title">
       <div class="brand-lockup">
-        <p class="eyebrow">Verbose Chords</p>
-        <h1 id="app-title">Guitar chord tones</h1>
+        <p class="eyebrow">Guitar chord tones</p>
+        <h1 id="app-title">ChordLens</h1>
       </div>
       <form id="chord-form" class="chord-form">
         <label for="chord-input">Chord</label>
@@ -753,9 +753,6 @@ function renderShapeCard(parsed: ParsedChord, shape: ChordShape): string {
         </div>
       </div>
       ${svg}
-      <div class="string-notes" aria-label="String notes">
-        ${DISPLAY_STRING_ORDER.map((stringIndex) => renderStringNote(annotated[stringIndex], stringIndex)).join("")}
-      </div>
     </article>
   `;
 }
@@ -901,27 +898,6 @@ function renderMarkerText(x: number, y: number, note: string, interval: string):
   return `
     <text class="marker-note" x="${x}" y="${y - 2}">${escapeHtml(note)}</text>
     <text class="marker-interval" x="${x}" y="${y + 11}">${escapeHtml(interval)}</text>
-  `;
-}
-
-function renderStringNote(item: AnnotatedString, stringIndex: number): string {
-  const stringLabel = `${6 - stringIndex}${item.stringName}`;
-
-  if (item.fret === null) {
-    return `
-      <div class="string-note muted">
-        <span>${escapeHtml(stringLabel)}</span>
-        <strong>x</strong>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="string-note tone-${item.role}">
-      <span>${escapeHtml(stringLabel)}-${item.fret}</span>
-      <strong>${escapeHtml(item.noteName ?? "")}</strong>
-      <em>${escapeHtml(item.interval ?? "")}</em>
-    </div>
   `;
 }
 
