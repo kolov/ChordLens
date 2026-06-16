@@ -61,6 +61,11 @@ interface AnnotatedString {
   role: ToneRole;
 }
 
+interface AudioEngine {
+  context: AudioContext;
+  output: GainNode;
+}
+
 const NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_NAMES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
@@ -299,7 +304,7 @@ let currentSelection: { rootName: string; qualityKey: QualityKey } = {
 };
 let activeParsedChord: ParsedChord | null = null;
 let activeShapes: ChordShape[] = [];
-let audioContext: AudioContext | null = null;
+let audioEngine: AudioEngine | null = null;
 
 const app = requireElement<HTMLDivElement>("#app");
 
@@ -921,7 +926,8 @@ function renderStringNote(item: AnnotatedString, stringIndex: number): string {
 }
 
 async function playShape(shape: ChordShape, mode: "chord" | "sequence"): Promise<void> {
-  const context = getAudioContext();
+  const engine = getAudioEngine();
+  const { context } = engine;
 
   if (context.state === "suspended") {
     await context.resume();
@@ -945,62 +951,133 @@ async function playShape(shape: ChordShape, mode: "chord" | "sequence"): Promise
     .filter((note): note is { frequency: number; stringIndex: number } => Boolean(note));
 
   notes.forEach((note, index) => {
-    const offset = mode === "chord" ? index * 0.012 : index * 0.18;
-    const velocity = mode === "chord" ? 0.12 : 0.16;
+    const offset = mode === "chord" ? index * 0.015 : index * 0.2;
+    const velocity = mode === "chord" ? 0.28 : 0.24;
     const pan = ((note.stringIndex - 2.5) / 2.5) * 0.28;
 
-    playPluckedNote(context, note.frequency, now + offset, velocity, pan);
+    playPluckedNote(context, engine.output, note.frequency, now + offset, velocity, pan);
   });
 }
 
-function getAudioContext(): AudioContext {
-  audioContext ??= new AudioContext();
-  return audioContext;
+function getAudioEngine(): AudioEngine {
+  if (audioEngine) {
+    return audioEngine;
+  }
+
+  const context = createAudioContext();
+  const output = context.createGain();
+  const limiter = context.createDynamicsCompressor();
+
+  output.gain.setValueAtTime(1.2, context.currentTime);
+  limiter.threshold.setValueAtTime(-12, context.currentTime);
+  limiter.knee.setValueAtTime(18, context.currentTime);
+  limiter.ratio.setValueAtTime(10, context.currentTime);
+  limiter.attack.setValueAtTime(0.003, context.currentTime);
+  limiter.release.setValueAtTime(0.18, context.currentTime);
+
+  output.connect(limiter);
+  limiter.connect(context.destination);
+
+  audioEngine = { context, output };
+  return audioEngine;
+}
+
+function createAudioContext(): AudioContext {
+  const AudioContextConstructor =
+    window.AudioContext ??
+    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+  if (!AudioContextConstructor) {
+    throw new Error("Web Audio is not supported in this browser.");
+  }
+
+  return new AudioContextConstructor();
 }
 
 function playPluckedNote(
   context: AudioContext,
+  output: AudioNode,
   frequency: number,
   startTime: number,
   velocity: number,
   pan: number,
 ): void {
-  const duration = 1.45;
+  const duration = 1.8;
   const fundamental = context.createOscillator();
   const overtone = context.createOscillator();
+  const shimmer = context.createOscillator();
+  const pick = context.createBufferSource();
   const filter = context.createBiquadFilter();
+  const pickFilter = context.createBiquadFilter();
   const gain = context.createGain();
+  const pickGain = context.createGain();
   const panner = context.createStereoPanner();
 
-  fundamental.type = "triangle";
+  fundamental.type = "sawtooth";
   fundamental.frequency.setValueAtTime(frequency, startTime);
   fundamental.detune.setValueAtTime(-2, startTime);
 
-  overtone.type = "sine";
+  overtone.type = "triangle";
   overtone.frequency.setValueAtTime(frequency * 2.01, startTime);
   overtone.detune.setValueAtTime(3, startTime);
 
+  shimmer.type = "sine";
+  shimmer.frequency.setValueAtTime(frequency * 3.01, startTime);
+  shimmer.detune.setValueAtTime(-5, startTime);
+
+  pick.buffer = createPickNoiseBuffer(context);
+
   filter.type = "lowpass";
-  filter.frequency.setValueAtTime(2600, startTime);
-  filter.frequency.exponentialRampToValueAtTime(680, startTime + duration);
-  filter.Q.setValueAtTime(5.5, startTime);
+  filter.frequency.setValueAtTime(4200, startTime);
+  filter.frequency.exponentialRampToValueAtTime(760, startTime + duration);
+  filter.Q.setValueAtTime(4.2, startTime);
+
+  pickFilter.type = "bandpass";
+  pickFilter.frequency.setValueAtTime(Math.max(1200, frequency * 7), startTime);
+  pickFilter.Q.setValueAtTime(1.4, startTime);
 
   gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.linearRampToValueAtTime(velocity, startTime + 0.006);
+  gain.gain.linearRampToValueAtTime(velocity, startTime + 0.004);
+  gain.gain.exponentialRampToValueAtTime(velocity * 0.42, startTime + 0.09);
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  pickGain.gain.setValueAtTime(0.0001, startTime);
+  pickGain.gain.linearRampToValueAtTime(velocity * 0.6, startTime + 0.002);
+  pickGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.055);
 
   panner.pan.setValueAtTime(pan, startTime);
 
   fundamental.connect(filter);
   overtone.connect(filter);
+  shimmer.connect(filter);
   filter.connect(gain);
+  pick.connect(pickFilter);
+  pickFilter.connect(pickGain);
+  pickGain.connect(gain);
   gain.connect(panner);
-  panner.connect(context.destination);
+  panner.connect(output);
 
   fundamental.start(startTime);
   overtone.start(startTime);
+  shimmer.start(startTime);
+  pick.start(startTime);
   fundamental.stop(startTime + duration + 0.04);
   overtone.stop(startTime + duration + 0.04);
+  shimmer.stop(startTime + duration + 0.04);
+  pick.stop(startTime + 0.06);
+}
+
+function createPickNoiseBuffer(context: AudioContext): AudioBuffer {
+  const sampleCount = Math.max(1, Math.floor(context.sampleRate * 0.06));
+  const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
+  const samples = buffer.getChannelData(0);
+
+  for (let index = 0; index < sampleCount; index += 1) {
+    const decay = 1 - index / sampleCount;
+    samples[index] = (Math.random() * 2 - 1) * decay * decay;
+  }
+
+  return buffer;
 }
 
 function midiToFrequency(midi: number): number {
