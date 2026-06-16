@@ -1,3 +1,5 @@
+[Open ChordLens](https://kolov.github.io/ChordLens/)
+
 # ChordLens
 
 A pure browser TypeScript app for visualising guitar chord shapes and the notes inside each voicing.
