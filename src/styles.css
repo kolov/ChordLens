@@ -354,7 +354,7 @@ h1 {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
 }
 
 .shape-card h3 {
@@ -374,6 +374,49 @@ h1 {
   font-size: 0.72rem;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.shape-tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #17212b;
+}
+
+.icon-button svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-button:hover,
+.icon-button:focus-visible {
+  border-color: #2c67b0;
+  color: #2c67b0;
+  outline: none;
+}
+
+.icon-button.is-playing {
+  border-color: #17212b;
+  background: #17212b;
+  color: #ffffff;
 }
 
 .chord-diagram {
@@ -589,6 +632,10 @@ h1 {
   .shape-card-header,
   .chord-title-row {
     display: grid;
+  }
+
+  .shape-tools {
+    justify-content: flex-start;
   }
 
   .quality-pill {

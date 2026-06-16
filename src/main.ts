@@ -36,6 +36,7 @@ interface ParsedChord {
 interface OpenString {
   name: string;
   pc: number;
+  midi: number;
 }
 
 interface ChordShape {
@@ -88,15 +89,16 @@ const NOTE_TO_PC: Record<string, number> = {
 };
 
 const OPEN_STRINGS: OpenString[] = [
-  { name: "E", pc: 4 },
-  { name: "A", pc: 9 },
-  { name: "D", pc: 2 },
-  { name: "G", pc: 7 },
-  { name: "B", pc: 11 },
-  { name: "E", pc: 4 },
+  { name: "E", pc: 4, midi: 40 },
+  { name: "A", pc: 9, midi: 45 },
+  { name: "D", pc: 2, midi: 50 },
+  { name: "G", pc: 7, midi: 55 },
+  { name: "B", pc: 11, midi: 59 },
+  { name: "E", pc: 4, midi: 64 },
 ];
 
 const DISPLAY_STRING_ORDER = [5, 4, 3, 2, 1, 0];
+const STRUM_STRING_ORDER = [0, 1, 2, 3, 4, 5];
 
 const QUALITIES: Record<QualityKey, ChordQuality> = {
   major: {
@@ -295,6 +297,9 @@ let currentSelection: { rootName: string; qualityKey: QualityKey } = {
   rootName: "E",
   qualityKey: "dominant7",
 };
+let activeParsedChord: ParsedChord | null = null;
+let activeShapes: ChordShape[] = [];
+let audioContext: AudioContext | null = null;
 
 const app = requireElement<HTMLDivElement>("#app");
 
@@ -384,6 +389,25 @@ qualityButtons.forEach((button) => {
   });
 });
 
+grid.addEventListener("click", (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>("[data-play-action]");
+
+  if (!button || !activeParsedChord) {
+    return;
+  }
+
+  const shape = activeShapes.find((candidate) => candidate.id === button.dataset.shapeId);
+  const action = button.dataset.playAction;
+
+  if (!shape || (action !== "chord" && action !== "sequence")) {
+    return;
+  }
+
+  button.classList.add("is-playing");
+  window.setTimeout(() => button.classList.remove("is-playing"), action === "sequence" ? 1300 : 450);
+  void playShape(shape, action);
+});
+
 document.querySelectorAll<HTMLButtonElement>(".example-chip").forEach((button) => {
   button.addEventListener("click", () => {
     const chord = button.dataset.chord ?? "E7";
@@ -409,6 +433,8 @@ function render(rawSymbol: string): void {
   const parsed = parseChord(rawSymbol);
 
   if (!parsed) {
+    activeParsedChord = null;
+    activeShapes = [];
     syncChoiceControls();
     summary.innerHTML = "";
     grid.innerHTML = "";
@@ -425,6 +451,8 @@ function render(rawSymbol: string): void {
   };
 
   const shapes = getShapes(parsed);
+  activeParsedChord = parsed;
+  activeShapes = shapes;
   const notes = parsed.quality.formula.map((tone) => ({
     ...tone,
     name: noteName((parsed.rootPc + tone.semitone) % 12, parsed.preferFlats),
@@ -705,7 +733,19 @@ function renderShapeCard(parsed: ParsedChord, shape: ChordShape): string {
           <p class="shape-category">${shape.category}</p>
           <h3>${escapeHtml(shape.name)}</h3>
         </div>
-        <span class="fret-code">${escapeHtml(compactFrets)}</span>
+        <div class="shape-tools">
+          <button type="button" class="icon-button" data-play-action="chord" data-shape-id="${escapeHtml(
+            shape.id,
+          )}" title="Play chord" aria-label="Play ${escapeHtml(parsed.displayName)} ${escapeHtml(shape.name)} as a chord">
+            ${chordIcon()}
+          </button>
+          <button type="button" class="icon-button" data-play-action="sequence" data-shape-id="${escapeHtml(
+            shape.id,
+          )}" title="Play sequence" aria-label="Play ${escapeHtml(parsed.displayName)} ${escapeHtml(shape.name)} as a sequence">
+            ${sequenceIcon()}
+          </button>
+          <span class="fret-code">${escapeHtml(compactFrets)}</span>
+        </div>
       </div>
       ${svg}
       <div class="string-notes" aria-label="String notes">
@@ -877,6 +917,117 @@ function renderStringNote(item: AnnotatedString, stringIndex: number): string {
       <strong>${escapeHtml(item.noteName ?? "")}</strong>
       <em>${escapeHtml(item.interval ?? "")}</em>
     </div>
+  `;
+}
+
+async function playShape(shape: ChordShape, mode: "chord" | "sequence"): Promise<void> {
+  const context = getAudioContext();
+
+  if (context.state === "suspended") {
+    await context.resume();
+  }
+
+  const now = context.currentTime + 0.025;
+  const stringOrder = mode === "chord" ? STRUM_STRING_ORDER : DISPLAY_STRING_ORDER;
+  const notes = stringOrder
+    .map((stringIndex) => {
+      const fret = shape.frets[stringIndex];
+
+      if (fret === null) {
+        return null;
+      }
+
+      return {
+        frequency: midiToFrequency(OPEN_STRINGS[stringIndex].midi + fret),
+        stringIndex,
+      };
+    })
+    .filter((note): note is { frequency: number; stringIndex: number } => Boolean(note));
+
+  notes.forEach((note, index) => {
+    const offset = mode === "chord" ? index * 0.012 : index * 0.18;
+    const velocity = mode === "chord" ? 0.12 : 0.16;
+    const pan = ((note.stringIndex - 2.5) / 2.5) * 0.28;
+
+    playPluckedNote(context, note.frequency, now + offset, velocity, pan);
+  });
+}
+
+function getAudioContext(): AudioContext {
+  audioContext ??= new AudioContext();
+  return audioContext;
+}
+
+function playPluckedNote(
+  context: AudioContext,
+  frequency: number,
+  startTime: number,
+  velocity: number,
+  pan: number,
+): void {
+  const duration = 1.45;
+  const fundamental = context.createOscillator();
+  const overtone = context.createOscillator();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  const panner = context.createStereoPanner();
+
+  fundamental.type = "triangle";
+  fundamental.frequency.setValueAtTime(frequency, startTime);
+  fundamental.detune.setValueAtTime(-2, startTime);
+
+  overtone.type = "sine";
+  overtone.frequency.setValueAtTime(frequency * 2.01, startTime);
+  overtone.detune.setValueAtTime(3, startTime);
+
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(2600, startTime);
+  filter.frequency.exponentialRampToValueAtTime(680, startTime + duration);
+  filter.Q.setValueAtTime(5.5, startTime);
+
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.linearRampToValueAtTime(velocity, startTime + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  panner.pan.setValueAtTime(pan, startTime);
+
+  fundamental.connect(filter);
+  overtone.connect(filter);
+  filter.connect(gain);
+  gain.connect(panner);
+  panner.connect(context.destination);
+
+  fundamental.start(startTime);
+  overtone.start(startTime);
+  fundamental.stop(startTime + duration + 0.04);
+  overtone.stop(startTime + duration + 0.04);
+}
+
+function midiToFrequency(midi: number): number {
+  return 440 * 2 ** ((midi - 69) / 12);
+}
+
+function chordIcon(): string {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 8v8"></path>
+      <path d="M9 6v12"></path>
+      <path d="M13 8v8"></path>
+      <path d="M17 5v14"></path>
+      <path d="M4 12h14"></path>
+      <path d="m18 9 3 3-3 3"></path>
+    </svg>
+  `;
+}
+
+function sequenceIcon(): string {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 6h3"></path>
+      <path d="M5 12h8"></path>
+      <path d="M5 18h13"></path>
+      <path d="m15 9 3 3-3 3"></path>
+    </svg>
   `;
 }
 
