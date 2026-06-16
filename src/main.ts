@@ -68,6 +68,16 @@ interface AudioEngine {
 
 const NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_NAMES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const LETTERS = ["C", "D", "E", "F", "G", "A", "B"];
+const LETTER_TO_NATURAL_PC: Record<string, number> = {
+  C: 0,
+  D: 2,
+  E: 4,
+  F: 5,
+  G: 7,
+  A: 9,
+  B: 11,
+};
 
 const NOTE_TO_PC: Record<string, number> = {
   C: 0,
@@ -460,7 +470,7 @@ function render(rawSymbol: string): void {
   activeShapes = shapes;
   const notes = parsed.quality.formula.map((tone) => ({
     ...tone,
-    name: noteName((parsed.rootPc + tone.semitone) % 12, parsed.preferFlats),
+    name: spellChordTone(parsed, tone),
   }));
 
   message.hidden = true;
@@ -558,6 +568,16 @@ function renderSummary(parsed: ParsedChord, notes: Array<FormulaTone & { name: s
           `,
         )
         .join("")}
+    </div>
+    <div class="definition-panel" aria-label="${escapeHtml(parsed.displayName)} chord definition">
+      <div class="definition-row">
+        <span>Semitone intervals</span>
+        <strong>${parsed.quality.formula.map((tone) => tone.semitone).join(" ")}</strong>
+      </div>
+      <div class="definition-row">
+        <span>Major scale positions</span>
+        <strong>${parsed.quality.formula.map((tone) => intervalLabelForDefinition(tone)).join(" ")}</strong>
+      </div>
     </div>
   `;
 }
@@ -775,7 +795,7 @@ function annotateShape(parsed: ParsedChord, shape: ChordShape): AnnotatedString[
     return {
       stringName: OPEN_STRINGS[stringIndex].name,
       fret,
-      noteName: noteName(pc, parsed.preferFlats),
+      noteName: tone ? spellChordTone(parsed, tone) : noteName(pc, parsed.preferFlats),
       interval: tone?.label ?? "?",
       role: tone?.role ?? "other",
     };
@@ -1058,6 +1078,62 @@ function createPickNoiseBuffer(context: AudioContext): AudioBuffer {
 
 function midiToFrequency(midi: number): number {
   return 440 * 2 ** ((midi - 69) / 12);
+}
+
+function intervalLabelForDefinition(tone: FormulaTone): string {
+  return tone.label === "R" ? "1" : tone.label;
+}
+
+function spellChordTone(parsed: ParsedChord, tone: FormulaTone): string {
+  const degree = degreeForTone(tone);
+  const rootLetter = parsed.rootName[0];
+  const rootLetterIndex = LETTERS.indexOf(rootLetter);
+  const targetLetter = LETTERS[(rootLetterIndex + degree - 1) % LETTERS.length];
+  const targetPc = (parsed.rootPc + tone.semitone) % 12;
+  const naturalPc = LETTER_TO_NATURAL_PC[targetLetter];
+  const accidentalDistance = normalizeAccidentalDistance(targetPc - naturalPc);
+
+  return `${targetLetter}${accidentalSuffix(accidentalDistance)}`;
+}
+
+function degreeForTone(tone: FormulaTone): number {
+  if (tone.label === "R") {
+    return 1;
+  }
+
+  const match = tone.label.match(/\d+/);
+
+  if (!match) {
+    return 1;
+  }
+
+  return Number(match[0]);
+}
+
+function normalizeAccidentalDistance(distance: number): number {
+  let normalized = distance;
+
+  while (normalized > 6) {
+    normalized -= 12;
+  }
+
+  while (normalized < -6) {
+    normalized += 12;
+  }
+
+  return normalized;
+}
+
+function accidentalSuffix(distance: number): string {
+  if (distance > 0) {
+    return "#".repeat(distance);
+  }
+
+  if (distance < 0) {
+    return "b".repeat(Math.abs(distance));
+  }
+
+  return "";
 }
 
 function chordIcon(): string {

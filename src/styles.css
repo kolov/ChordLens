@@ -296,6 +296,38 @@ h1 {
   font-size: 1.1rem;
 }
 
+.definition-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.definition-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.definition-row span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.definition-row strong {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
 .tone-root {
   color: var(--root);
 }
