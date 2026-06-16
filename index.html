@@ -72,10 +72,10 @@
         </div>
         <div class="shape-tools">
           <button type="button" class="icon-button" data-play-action="chord" data-shape-id="${$(t.id)}" title="Play chord" aria-label="Play ${$(e.displayName)} ${$(t.name)} as a chord">
-            ${Z()}
+            ${re()}
           </button>
           <button type="button" class="icon-button" data-play-action="sequence" data-shape-id="${$(t.id)}" title="Play sequence" aria-label="Play ${$(e.displayName)} ${$(t.name)} as a sequence">
-            ${ne()}
+            ${ie()}
           </button>
           <span class="fret-code">${$(a)}</span>
         </div>
@@ -123,7 +123,7 @@
       <strong>${$(e.noteName??``)}</strong>
       <em>${$(e.interval??``)}</em>
     </div>
-  `}async function q(e,t){let n=J();n.state===`suspended`&&await n.resume();let o=n.currentTime+.025;(t===`chord`?a:i).map(t=>{let n=e.frets[t];return n===null?null:{frequency:X(r[t].midi+n),stringIndex:t}}).filter(e=>!!e).forEach((e,r)=>{let i=t===`chord`?r*.012:r*.18,a=t===`chord`?.12:.16,s=(e.stringIndex-2.5)/2.5*.28;Y(n,e.frequency,o+i,a,s)})}function J(){return g??=new AudioContext,g}function Y(e,t,n,r,i){let a=1.45,o=e.createOscillator(),s=e.createOscillator(),c=e.createBiquadFilter(),l=e.createGain(),u=e.createStereoPanner();o.type=`triangle`,o.frequency.setValueAtTime(t,n),o.detune.setValueAtTime(-2,n),s.type=`sine`,s.frequency.setValueAtTime(t*2.01,n),s.detune.setValueAtTime(3,n),c.type=`lowpass`,c.frequency.setValueAtTime(2600,n),c.frequency.exponentialRampToValueAtTime(680,n+a),c.Q.setValueAtTime(5.5,n),l.gain.setValueAtTime(1e-4,n),l.gain.linearRampToValueAtTime(r,n+.006),l.gain.exponentialRampToValueAtTime(1e-4,n+a),u.pan.setValueAtTime(i,n),o.connect(c),s.connect(c),c.connect(l),l.connect(u),u.connect(e.destination),o.start(n),s.start(n),o.stop(n+a+.04),s.stop(n+a+.04)}function X(e){return 440*2**((e-69)/12)}function Z(){return`
+  `}async function q(e,t){let n=J(),{context:o}=n;o.state===`suspended`&&await o.resume();let s=o.currentTime+.025;(t===`chord`?a:i).map(t=>{let n=e.frets[t];return n===null?null:{frequency:ne(r[t].midi+n),stringIndex:t}}).filter(e=>!!e).forEach((e,r)=>{let i=t===`chord`?r*.015:r*.2,a=t===`chord`?.28:.24,c=(e.stringIndex-2.5)/2.5*.28;X(o,n.output,e.frequency,s+i,a,c)})}function J(){if(g)return g;let e=Y(),t=e.createGain(),n=e.createDynamicsCompressor();return t.gain.setValueAtTime(1.2,e.currentTime),n.threshold.setValueAtTime(-12,e.currentTime),n.knee.setValueAtTime(18,e.currentTime),n.ratio.setValueAtTime(10,e.currentTime),n.attack.setValueAtTime(.003,e.currentTime),n.release.setValueAtTime(.18,e.currentTime),t.connect(n),n.connect(e.destination),g={context:e,output:t},g}function Y(){let e=window.AudioContext??window.webkitAudioContext;if(!e)throw Error(`Web Audio is not supported in this browser.`);return new e}function X(e,t,n,r,i,a){let o=1.8,s=e.createOscillator(),c=e.createOscillator(),l=e.createOscillator(),u=e.createBufferSource(),d=e.createBiquadFilter(),f=e.createBiquadFilter(),p=e.createGain(),m=e.createGain(),h=e.createStereoPanner();s.type=`sawtooth`,s.frequency.setValueAtTime(n,r),s.detune.setValueAtTime(-2,r),c.type=`triangle`,c.frequency.setValueAtTime(n*2.01,r),c.detune.setValueAtTime(3,r),l.type=`sine`,l.frequency.setValueAtTime(n*3.01,r),l.detune.setValueAtTime(-5,r),u.buffer=Z(e),d.type=`lowpass`,d.frequency.setValueAtTime(4200,r),d.frequency.exponentialRampToValueAtTime(760,r+o),d.Q.setValueAtTime(4.2,r),f.type=`bandpass`,f.frequency.setValueAtTime(Math.max(1200,n*7),r),f.Q.setValueAtTime(1.4,r),p.gain.setValueAtTime(1e-4,r),p.gain.linearRampToValueAtTime(i,r+.004),p.gain.exponentialRampToValueAtTime(i*.42,r+.09),p.gain.exponentialRampToValueAtTime(1e-4,r+o),m.gain.setValueAtTime(1e-4,r),m.gain.linearRampToValueAtTime(i*.6,r+.002),m.gain.exponentialRampToValueAtTime(1e-4,r+.055),h.pan.setValueAtTime(a,r),s.connect(d),c.connect(d),l.connect(d),d.connect(p),u.connect(f),f.connect(m),m.connect(p),p.connect(h),h.connect(t),s.start(r),c.start(r),l.start(r),u.start(r),s.stop(r+o+.04),c.stop(r+o+.04),l.stop(r+o+.04),u.stop(r+.06)}function Z(e){let t=Math.max(1,Math.floor(e.sampleRate*.06)),n=e.createBuffer(1,t,e.sampleRate),r=n.getChannelData(0);for(let e=0;e<t;e+=1){let n=1-e/t;r[e]=(Math.random()*2-1)*n*n}return n}function ne(e){return 440*2**((e-69)/12)}function re(){return`
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M5 8v8"></path>
       <path d="M9 6v12"></path>
@@ -132,7 +132,7 @@
       <path d="M4 12h14"></path>
       <path d="m18 9 3 3-3 3"></path>
     </svg>
-  `}function ne(){return`
+  `}function ie(){return`
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M5 6h3"></path>
       <path d="M5 12h8"></path>
