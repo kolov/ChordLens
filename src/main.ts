@@ -44,7 +44,10 @@ interface ChordShape {
   name: string;
   frets: Array<number | null>;
   category: "Popular" | "Movable" | "Found";
+  sourceUrl?: string;
 }
+
+type CuratedShape = Omit<ChordShape, "id" | "category" | "sourceUrl">;
 
 interface ShapeTemplate {
   id: string;
@@ -239,33 +242,100 @@ const QUALITY_SUFFIXES = new Map<string, QualityKey>([
   ["5", "power"],
 ]);
 
-const CURATED_SHAPES: Record<string, Omit<ChordShape, "id" | "category">[]> = {
-  "C:major": [{ name: "Open C", frets: [null, 3, 2, 0, 1, 0] }],
-  "A:major": [{ name: "Open A", frets: [null, 0, 2, 2, 2, 0] }],
+const GTRLIB_QUALITY_SLUGS: Record<QualityKey, string> = {
+  major: "major",
+  minor: "minor",
+  dominant7: "dominant-7th",
+  major7: "major-7th",
+  minor7: "minor-7th",
+  sus4: "suspended-4th",
+  sus2: "suspended-2nd",
+  power: "5",
+};
+
+const CURATED_SHAPES: Record<string, CuratedShape[]> = {
+  "C:major": [
+    { name: "Open C", frets: [null, 3, 2, 0, 1, 0] },
+    { name: "C A-form barre", frets: [null, 3, 5, 5, 5, 3] },
+  ],
+  "A:major": [
+    { name: "Open A", frets: [null, 0, 2, 2, 2, 0] },
+    { name: "A E-form barre", frets: [5, 7, 7, 6, 5, 5] },
+  ],
   "G:major": [
     { name: "Open G", frets: [3, 2, 0, 0, 0, 3] },
     { name: "Open G with D", frets: [3, 2, 0, 0, 3, 3] },
+    { name: "G E-form barre", frets: [3, 5, 5, 4, 3, 3] },
   ],
-  "E:major": [{ name: "Open E", frets: [0, 2, 2, 1, 0, 0] }],
-  "D:major": [{ name: "Open D", frets: [null, null, 0, 2, 3, 2] }],
-  "A:minor": [{ name: "Open Am", frets: [null, 0, 2, 2, 1, 0] }],
-  "E:minor": [{ name: "Open Em", frets: [0, 2, 2, 0, 0, 0] }],
-  "D:minor": [{ name: "Open Dm", frets: [null, null, 0, 2, 3, 1] }],
-  "C:dominant7": [{ name: "Open C7", frets: [null, 3, 2, 3, 1, 0] }],
-  "A:dominant7": [{ name: "Open A7", frets: [null, 0, 2, 0, 2, 0] }],
-  "G:dominant7": [{ name: "Open G7", frets: [3, 2, 0, 0, 0, 1] }],
+  "E:major": [
+    { name: "Open E", frets: [0, 2, 2, 1, 0, 0] },
+    { name: "E A-form barre", frets: [null, 7, 9, 9, 9, 7] },
+  ],
+  "D:major": [
+    { name: "Open D", frets: [null, null, 0, 2, 3, 2] },
+    { name: "D A-form barre", frets: [null, 5, 7, 7, 7, 5] },
+  ],
+  "A:minor": [
+    { name: "Open Am", frets: [null, 0, 2, 2, 1, 0] },
+    { name: "Am E-minor form barre", frets: [5, 7, 7, 5, 5, 5] },
+  ],
+  "E:minor": [
+    { name: "Open Em", frets: [0, 2, 2, 0, 0, 0] },
+    { name: "Em A-minor form barre", frets: [null, 7, 9, 9, 8, 7] },
+  ],
+  "D:minor": [
+    { name: "Open Dm", frets: [null, null, 0, 2, 3, 1] },
+    { name: "Dm A-minor form barre", frets: [null, 5, 7, 7, 6, 5] },
+  ],
+  "C:dominant7": [
+    { name: "Open C7", frets: [null, 3, 2, 3, 1, 0] },
+    { name: "C7 A7-form barre", frets: [null, 3, 5, 3, 5, 3] },
+  ],
+  "A:dominant7": [
+    { name: "Open A7", frets: [null, 0, 2, 0, 2, 0] },
+    { name: "A7 E7-form barre", frets: [5, 7, 5, 6, 5, 5] },
+  ],
+  "G:dominant7": [
+    { name: "Open G7", frets: [3, 2, 0, 0, 0, 1] },
+    { name: "G7 E7-form barre", frets: [3, 5, 3, 4, 3, 3] },
+  ],
   "E:dominant7": [
     { name: "Open E7", frets: [0, 2, 0, 1, 0, 0] },
-    { name: "Open E7 with high D", frets: [0, 2, 0, 1, 3, 0] },
+    { name: "Open E7 four-finger", frets: [0, 2, 2, 1, 3, 0] },
+    { name: "E7 A7-form barre", frets: [null, 7, 9, 7, 9, 7] },
   ],
-  "D:dominant7": [{ name: "Open D7", frets: [null, null, 0, 2, 1, 2] }],
-  "B:dominant7": [{ name: "Open B7", frets: [null, 2, 1, 2, 0, 2] }],
-  "E:minor7": [{ name: "Open Em7", frets: [0, 2, 2, 0, 3, 0] }],
-  "A:minor7": [{ name: "Open Am7", frets: [null, 0, 2, 0, 1, 0] }],
-  "D:minor7": [{ name: "Open Dm7", frets: [null, null, 0, 2, 1, 1] }],
-  "D:major7": [{ name: "Open Dmaj7", frets: [null, null, 0, 2, 2, 2] }],
-  "A:major7": [{ name: "Open Amaj7", frets: [null, 0, 2, 1, 2, 0] }],
-  "E:major7": [{ name: "Open Emaj7", frets: [0, 2, 1, 1, 0, 0] }],
+  "D:dominant7": [
+    { name: "Open D7", frets: [null, null, 0, 2, 1, 2] },
+    { name: "D7 A7-form barre", frets: [null, 5, 7, 5, 7, 5] },
+  ],
+  "B:dominant7": [
+    { name: "Open B7", frets: [null, 2, 1, 2, 0, 2] },
+    { name: "B7 A7-form barre", frets: [null, 2, 4, 2, 4, 2] },
+  ],
+  "E:minor7": [
+    { name: "Open Em7", frets: [0, 2, 2, 0, 3, 0] },
+    { name: "Em7 A-minor-7 form barre", frets: [null, 7, 9, 7, 8, 7] },
+  ],
+  "A:minor7": [
+    { name: "Open Am7", frets: [null, 0, 2, 0, 1, 0] },
+    { name: "Am7 E-minor-7 form barre", frets: [5, 7, 5, 5, 5, 5] },
+  ],
+  "D:minor7": [
+    { name: "Open Dm7", frets: [null, null, 0, 2, 1, 1] },
+    { name: "Dm7 A-minor-7 form barre", frets: [null, 5, 7, 5, 6, 5] },
+  ],
+  "D:major7": [
+    { name: "Open Dmaj7", frets: [null, null, 0, 2, 2, 2] },
+    { name: "Dmaj7 Amaj7-form barre", frets: [null, 5, 7, 6, 7, 5] },
+  ],
+  "A:major7": [
+    { name: "Open Amaj7", frets: [null, 0, 2, 1, 2, 0] },
+    { name: "Amaj7 Emaj7-form barre", frets: [5, 7, 6, 6, 5, 5] },
+  ],
+  "E:major7": [
+    { name: "Open Emaj7", frets: [0, 2, 1, 1, 0, 0] },
+    { name: "Emaj7 Amaj7-form barre", frets: [null, 7, 9, 8, 9, 7] },
+  ],
 };
 
 const MOVABLE_TEMPLATES: Partial<Record<QualityKey, ShapeTemplate[]>> = {
@@ -309,7 +379,6 @@ const MOVABLE_TEMPLATES: Partial<Record<QualityKey, ShapeTemplate[]>> = {
   ],
 };
 
-const EXAMPLE_CHORDS = ["E7", "C", "Am", "G7", "Dmaj7", "F#m7", "Bbmaj7", "Asus2"];
 const ROOT_CHOICES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const QUALITY_CHOICES: Array<{ key: QualityKey; label: string }> = [
   { key: "major", label: "maj" },
@@ -329,6 +398,7 @@ let currentSelection: { rootName: string; qualityKey: QualityKey } = {
 let activeParsedChord: ParsedChord | null = null;
 let activeShapes: ChordShape[] = [];
 let audioEngine: AudioEngine | null = null;
+let chordHistory: string[] = [];
 
 const app = requireElement<HTMLDivElement>("#app");
 
@@ -343,7 +413,6 @@ app.innerHTML = `
         <label for="chord-input">Chord</label>
         <div class="input-row">
           <input id="chord-input" name="chord" value="E7" autocomplete="off" spellcheck="false" />
-          <button type="submit">Show</button>
         </div>
       </form>
       <div class="chooser-stack">
@@ -366,9 +435,10 @@ app.innerHTML = `
           </div>
         </fieldset>
       </div>
-      <div class="example-row" aria-label="Quick examples">
-        ${EXAMPLE_CHORDS.map((chord) => `<button type="button" class="example-chip" data-chord="${chord}">${chord}</button>`).join("")}
-      </div>
+      <fieldset class="choice-group history-group">
+        <legend>History</legend>
+        <div id="history-row" class="history-row" aria-label="Chord history"></div>
+      </fieldset>
       <div id="summary" class="summary-panel"></div>
     </section>
     <section class="results-panel" aria-live="polite">
@@ -383,6 +453,7 @@ const input = requireElement<HTMLInputElement>("#chord-input");
 const summary = requireElement<HTMLDivElement>("#summary");
 const grid = requireElement<HTMLDivElement>("#shape-grid");
 const message = requireElement<HTMLDivElement>("#message");
+const historyRow = requireElement<HTMLDivElement>("#history-row");
 const rootButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".root-option"));
 const qualityButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".quality-option"));
 
@@ -398,7 +469,12 @@ input.addEventListener("input", () => {
 rootButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const rootName = button.dataset.root ?? currentSelection.rootName;
-    input.value = chordSymbol(rootName, currentSelection.qualityKey);
+    currentSelection = {
+      rootName,
+      qualityKey: currentSelection.qualityKey,
+    };
+
+    input.value = chordSymbol(currentSelection.rootName, currentSelection.qualityKey);
     input.focus();
     render(input.value);
   });
@@ -412,9 +488,13 @@ qualityButtons.forEach((button) => {
       return;
     }
 
-    input.value = chordSymbol(currentSelection.rootName, qualityKey);
+    currentSelection = {
+      rootName: currentSelection.rootName,
+      qualityKey,
+    };
+
     input.focus();
-    render(input.value);
+    syncChoiceControls();
   });
 });
 
@@ -437,13 +517,15 @@ grid.addEventListener("click", (event) => {
   void playShape(shape, action);
 });
 
-document.querySelectorAll<HTMLButtonElement>(".example-chip").forEach((button) => {
-  button.addEventListener("click", () => {
-    const chord = button.dataset.chord ?? "E7";
+historyRow.addEventListener("click", (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>("[data-history-chord]");
+
+  if (button) {
+    const chord = button.dataset.historyChord ?? "";
     input.value = chord;
     input.focus();
     render(chord);
-  });
+  }
 });
 
 render(input.value);
@@ -490,8 +572,19 @@ function render(rawSymbol: string): void {
   message.hidden = true;
   message.textContent = "";
   syncChoiceControls();
+  updateHistory(parsed.displayName);
   summary.innerHTML = renderSummary(parsed, notes);
   grid.innerHTML = shapes.map((shape) => renderShapeCard(parsed, shape)).join("");
+}
+
+function updateHistory(displayName: string): void {
+  chordHistory = [displayName, ...chordHistory.filter((chord) => chord !== displayName)].slice(0, 8);
+  historyRow.innerHTML = chordHistory
+    .map(
+      (chord) =>
+        `<button type="button" class="history-chip" data-history-chord="${escapeHtml(chord)}">${escapeHtml(chord)}</button>`,
+    )
+    .join("");
 }
 
 function parseChord(inputValue: string): ParsedChord | null {
@@ -544,9 +637,13 @@ function chordSymbol(rootName: string, qualityKey: QualityKey): string {
 }
 
 function syncChoiceControls(): void {
+  const committedSelectionMatches =
+    activeParsedChord?.rootName === currentSelection.rootName &&
+    activeParsedChord.quality.key === currentSelection.qualityKey;
+
   rootButtons.forEach((button) => {
     const rootName = button.dataset.root ?? "";
-    const isActive = rootName === currentSelection.rootName;
+    const isActive = committedSelectionMatches && rootName === currentSelection.rootName;
 
     button.textContent = chordSymbol(rootName, currentSelection.qualityKey);
     button.classList.toggle("is-active", isActive);
@@ -564,12 +661,23 @@ function syncChoiceControls(): void {
 
 function renderSummary(parsed: ParsedChord, notes: Array<FormulaTone & { name: string }>): string {
   return `
+    ${renderChromaticMap(parsed)}
     <div class="chord-title-row">
       <div>
         <p class="summary-label">Current chord</p>
         <h2>${escapeHtml(parsed.displayName)}</h2>
       </div>
       <span class="quality-pill">${escapeHtml(parsed.quality.name)}</span>
+    </div>
+    <div class="definition-panel" aria-label="${escapeHtml(parsed.displayName)} chord definition">
+      <div class="definition-row">
+        <span>Semitone intervals</span>
+        <strong>${parsed.quality.formula.map((tone) => tone.semitone).join(" ")}</strong>
+      </div>
+      <div class="definition-row">
+        <span>Major scale positions</span>
+        <strong>${parsed.quality.formula.map((tone) => intervalLabelForDefinition(tone)).join(" ")}</strong>
+      </div>
     </div>
     <div class="tone-table">
       ${notes
@@ -583,20 +691,15 @@ function renderSummary(parsed: ParsedChord, notes: Array<FormulaTone & { name: s
         )
         .join("")}
     </div>
-    <div class="definition-panel" aria-label="${escapeHtml(parsed.displayName)} chord definition">
-      <div class="definition-row">
-        <span>Semitone intervals</span>
-        <strong>${parsed.quality.formula.map((tone) => tone.semitone).join(" ")}</strong>
-      </div>
-      <div class="definition-row">
-        <span>Major scale positions</span>
-        <strong>${parsed.quality.formula.map((tone) => intervalLabelForDefinition(tone)).join(" ")}</strong>
-      </div>
-      <div class="interval-map">
-        <p class="definition-label">Chromatic map</p>
-        <div class="interval-map-grid">
-          ${CHROMATIC_INTERVAL_MAP.map((interval) => renderIntervalMapToken(parsed, interval)).join("")}
-        </div>
+  `;
+}
+
+function renderChromaticMap(parsed: ParsedChord): string {
+  return `
+    <div class="interval-map">
+      <p class="definition-label">Chromatic map</p>
+      <div class="interval-map-grid">
+        ${CHROMATIC_INTERVAL_MAP.map((interval) => renderIntervalMapToken(parsed, interval)).join("")}
       </div>
     </div>
   `;
@@ -615,12 +718,16 @@ function renderIntervalMapToken(parsed: ParsedChord, interval: { semitone: numbe
 }
 
 function getShapes(parsed: ParsedChord): ChordShape[] {
-  const curated = getCuratedShapes(parsed);
-  const movable = getMovableShapes(parsed);
-  const combined = dedupeShapes([...curated, ...movable]).slice(0, 8);
+  const curated = dedupeShapes(getCuratedShapes(parsed));
 
-  if (combined.length > 0) {
-    return combined;
+  if (curated.length > 0) {
+    return curated;
+  }
+
+  const movable = dedupeShapes(getMovableShapes(parsed)).slice(0, 6);
+
+  if (movable.length > 0) {
+    return movable;
   }
 
   return findFallbackShapes(parsed);
@@ -634,7 +741,30 @@ function getCuratedShapes(parsed: ParsedChord): ChordShape[] {
     ...shape,
     id: `curated-${rootKey}-${parsed.quality.key}-${index}`,
     category: "Popular",
+    sourceUrl: gtrLibChordUrl(parsed),
   }));
+}
+
+function gtrLibChordUrl(parsed: ParsedChord): string {
+  const rootSlug = gtrLibRootSlug(parsed.rootName);
+  const qualitySlug = GTRLIB_QUALITY_SLUGS[parsed.quality.key];
+  const chordSlug = parsed.quality.key === "power" ? `${rootSlug}${qualitySlug}` : `${rootSlug}-${qualitySlug}`;
+
+  return `https://gtrlib.com/chords/${chordSlug}`;
+}
+
+function gtrLibRootSlug(rootName: string): string {
+  const rootLetter = rootName[0].toLowerCase();
+
+  if (rootName.endsWith("#")) {
+    return `${rootLetter}-sharp`;
+  }
+
+  if (rootName.endsWith("b")) {
+    return `${rootLetter}-flat`;
+  }
+
+  return rootLetter;
 }
 
 function getMovableShapes(parsed: ParsedChord): ChordShape[] {
@@ -787,7 +917,7 @@ function renderShapeCard(parsed: ParsedChord, shape: ChordShape): string {
     <article class="shape-card">
       <div class="shape-card-header">
         <div>
-          <p class="shape-category">${shape.category}</p>
+          ${renderShapeCategory(parsed, shape)}
           <h3>${escapeHtml(shape.name)}</h3>
         </div>
         <div class="shape-tools">
@@ -807,6 +937,16 @@ function renderShapeCard(parsed: ParsedChord, shape: ChordShape): string {
       ${svg}
     </article>
   `;
+}
+
+function renderShapeCategory(parsed: ParsedChord, shape: ChordShape): string {
+  const sourceLink = shape.sourceUrl
+    ? ` <span aria-hidden="true">·</span> <a class="source-link" href="${escapeHtml(
+        shape.sourceUrl,
+      )}" target="_blank" rel="noreferrer" title="Open ${escapeHtml(parsed.displayName)} reference on GtrLib">GtrLib</a>`
+    : "";
+
+  return `<p class="shape-category">${escapeHtml(shape.category)}${sourceLink}</p>`;
 }
 
 function annotateShape(parsed: ParsedChord, shape: ChordShape): AnnotatedString[] {
@@ -962,7 +1102,7 @@ async function playShape(shape: ChordShape, mode: "chord" | "sequence"): Promise
   }
 
   const now = context.currentTime + 0.025;
-  const stringOrder = mode === "chord" ? STRUM_STRING_ORDER : DISPLAY_STRING_ORDER;
+  const stringOrder = STRUM_STRING_ORDER;
   const notes = stringOrder
     .map((stringIndex) => {
       const fret = shape.frets[stringIndex];
