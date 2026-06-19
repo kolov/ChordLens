@@ -99,6 +99,36 @@ h1 {
   letter-spacing: 0;
 }
 
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f1ede3;
+}
+
+.mode-option {
+  min-height: 36px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 850;
+}
+
+.mode-option:hover,
+.mode-option:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+
+.mode-option.is-active {
+  background: #17212b;
+  color: #ffffff;
+}
+
 .chord-form {
   display: grid;
   gap: 8px;
