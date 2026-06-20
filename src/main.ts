@@ -12,6 +12,10 @@ type QualityKey =
 
 type ToneRole = "root" | "third" | "fifth" | "seventh" | "extension" | "other";
 
+type ScaleKey = "major" | "minor" | "pentatonic" | "blues";
+
+type AppMode = "chord" | "scale";
+
 interface FormulaTone {
   semitone: number;
   label: string;
@@ -23,6 +27,44 @@ interface ChordQuality {
   suffix: string;
   name: string;
   formula: FormulaTone[];
+}
+
+interface ScaleType {
+  key: ScaleKey;
+  // Suffix used in the input/history, e.g. "minor pentatonic" -> "A minor pentatonic".
+  suffix: string;
+  // Short label for the Type picker button.
+  shortLabel: string;
+  name: string;
+  // Whole/half step pattern between consecutive tones, for the summary panel.
+  stepPattern: string;
+  formula: FormulaTone[];
+}
+
+interface ParsedScale {
+  rootName: string;
+  rootPc: number;
+  preferFlats: boolean;
+  scale: ScaleType;
+  displayName: string;
+}
+
+interface ScaleNote {
+  stringIndex: number;
+  fret: number;
+  noteName: string;
+  degree: string;
+  role: ToneRole;
+  midi: number;
+}
+
+interface ScaleBox {
+  id: string;
+  name: string;
+  rangeLabel: string;
+  baseFret: number;
+  fretCount: number;
+  notes: ScaleNote[];
 }
 
 interface ParsedChord {
@@ -243,6 +285,97 @@ const QUALITY_SUFFIXES = new Map<string, QualityKey>([
   ["5", "power"],
 ]);
 
+const SCALES: Record<ScaleKey, ScaleType> = {
+  major: {
+    key: "major",
+    suffix: "major",
+    shortLabel: "major",
+    name: "major (Ionian)",
+    stepPattern: "W W H W W W H",
+    formula: [
+      { semitone: 0, label: "1", role: "root" },
+      { semitone: 2, label: "2", role: "other" },
+      { semitone: 4, label: "3", role: "other" },
+      { semitone: 5, label: "4", role: "other" },
+      { semitone: 7, label: "5", role: "other" },
+      { semitone: 9, label: "6", role: "other" },
+      { semitone: 11, label: "7", role: "other" },
+    ],
+  },
+  minor: {
+    key: "minor",
+    suffix: "minor",
+    shortLabel: "minor",
+    name: "natural minor (Aeolian)",
+    stepPattern: "W H W W H W W",
+    formula: [
+      { semitone: 0, label: "1", role: "root" },
+      { semitone: 2, label: "2", role: "other" },
+      { semitone: 3, label: "b3", role: "other" },
+      { semitone: 5, label: "4", role: "other" },
+      { semitone: 7, label: "5", role: "other" },
+      { semitone: 8, label: "b6", role: "other" },
+      { semitone: 10, label: "b7", role: "other" },
+    ],
+  },
+  pentatonic: {
+    key: "pentatonic",
+    suffix: "minor pentatonic",
+    shortLabel: "min pent",
+    name: "minor pentatonic",
+    stepPattern: "3 2 2 3 2",
+    formula: [
+      { semitone: 0, label: "1", role: "root" },
+      { semitone: 3, label: "b3", role: "other" },
+      { semitone: 5, label: "4", role: "other" },
+      { semitone: 7, label: "5", role: "other" },
+      { semitone: 10, label: "b7", role: "other" },
+    ],
+  },
+  blues: {
+    key: "blues",
+    suffix: "blues",
+    shortLabel: "blues",
+    name: "minor blues",
+    stepPattern: "3 2 1 1 3 2",
+    formula: [
+      { semitone: 0, label: "1", role: "root" },
+      { semitone: 3, label: "b3", role: "other" },
+      { semitone: 5, label: "4", role: "other" },
+      // The "blue note" (b5) gets its own accent colour via the seventh role.
+      { semitone: 6, label: "b5", role: "seventh" },
+      { semitone: 7, label: "5", role: "other" },
+      { semitone: 10, label: "b7", role: "other" },
+    ],
+  },
+};
+
+const SCALE_SUFFIXES = new Map<string, ScaleKey>([
+  ["major", "major"],
+  ["maj", "major"],
+  ["ionian", "major"],
+  ["minor", "minor"],
+  ["min", "minor"],
+  ["m", "minor"],
+  ["naturalminor", "minor"],
+  ["aeolian", "minor"],
+  ["minorpentatonic", "pentatonic"],
+  ["minpentatonic", "pentatonic"],
+  ["pentatonic", "pentatonic"],
+  ["minpent", "pentatonic"],
+  ["pent", "pentatonic"],
+  ["minorblues", "blues"],
+  ["minblues", "blues"],
+  ["blues", "blues"],
+]);
+
+const SCALE_CHOICES: Array<{ key: ScaleKey; label: string }> = [
+  { key: "major", label: "major" },
+  { key: "minor", label: "minor" },
+  { key: "pentatonic", label: "min pent" },
+  { key: "blues", label: "blues" },
+];
+
 const GTRLIB_QUALITY_SLUGS: Record<QualityKey, string> = {
   major: "major",
   minor: "minor",
@@ -392,14 +525,23 @@ const QUALITY_CHOICES: Array<{ key: QualityKey; label: string }> = [
   { key: "power", label: "5" },
 ];
 
-let currentSelection: { rootName: string; qualityKey: QualityKey } = {
+let currentSelection: {
+  mode: AppMode;
+  rootName: string;
+  qualityKey: QualityKey;
+  scaleKey: ScaleKey;
+} = {
+  mode: "chord",
   rootName: "E",
   qualityKey: "dominant7",
+  scaleKey: "pentatonic",
 };
 let activeParsedChord: ParsedChord | null = null;
+let activeParsedScale: ParsedScale | null = null;
 let activeShapes: ChordShape[] = [];
+let activeScaleBoxes: ScaleBox[] = [];
 let audioEngine: AudioEngine | null = null;
-let chordHistory: string[] = [];
+let history: Array<{ name: string; mode: AppMode }> = [];
 
 const app = requireElement<HTMLDivElement>("#app");
 
@@ -410,8 +552,12 @@ app.innerHTML = `
         <p class="eyebrow">Guitar chord tones</p>
         <h1 id="app-title">ChordLens</h1>
       </div>
+      <div class="mode-toggle" role="group" aria-label="Mode">
+        <button type="button" class="mode-option is-active" data-mode="chord" aria-pressed="true">Chords</button>
+        <button type="button" class="mode-option" data-mode="scale" aria-pressed="false">Scales</button>
+      </div>
       <form id="chord-form" class="chord-form">
-        <label for="chord-input">Chord</label>
+        <label id="input-label" for="chord-input">Chord</label>
         <div class="input-row">
           <input id="chord-input" name="chord" value="E7" autocomplete="off" spellcheck="false" />
         </div>
@@ -419,10 +565,16 @@ app.innerHTML = `
       <div class="chooser-stack">
         <fieldset class="choice-group">
           <legend>Type</legend>
-          <div id="quality-picker" class="quality-grid">
+          <div id="quality-picker" class="quality-grid" data-mode-panel="chord">
             ${QUALITY_CHOICES.map(
               (quality) =>
                 `<button type="button" class="quality-option" data-quality="${quality.key}" aria-pressed="false">${quality.label}</button>`,
+            ).join("")}
+          </div>
+          <div id="scale-picker" class="quality-grid" data-mode-panel="scale" hidden>
+            ${SCALE_CHOICES.map(
+              (scale) =>
+                `<button type="button" class="quality-option" data-scale="${scale.key}" aria-pressed="false">${scale.label}</button>`,
             ).join("")}
           </div>
         </fieldset>
@@ -451,12 +603,17 @@ app.innerHTML = `
 
 const form = requireElement<HTMLFormElement>("#chord-form");
 const input = requireElement<HTMLInputElement>("#chord-input");
+const inputLabel = requireElement<HTMLLabelElement>("#input-label");
 const summary = requireElement<HTMLDivElement>("#summary");
 const grid = requireElement<HTMLDivElement>("#shape-grid");
 const message = requireElement<HTMLDivElement>("#message");
 const historyRow = requireElement<HTMLDivElement>("#history-row");
+const qualityPicker = requireElement<HTMLDivElement>("#quality-picker");
+const scalePicker = requireElement<HTMLDivElement>("#scale-picker");
 const rootButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".root-option"));
-const qualityButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".quality-option"));
+const qualityButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-quality]"));
+const scaleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-scale]"));
+const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".mode-option"));
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -467,15 +624,20 @@ input.addEventListener("input", () => {
   render(input.value);
 });
 
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const mode = button.dataset.mode;
+
+    if (mode === "chord" || mode === "scale") {
+      setMode(mode);
+    }
+  });
+});
+
 rootButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    const rootName = button.dataset.root ?? currentSelection.rootName;
-    currentSelection = {
-      rootName,
-      qualityKey: currentSelection.qualityKey,
-    };
-
-    input.value = chordSymbol(currentSelection.rootName, currentSelection.qualityKey);
+    currentSelection.rootName = button.dataset.root ?? currentSelection.rootName;
+    input.value = currentSymbol();
     input.focus();
     render(input.value);
   });
@@ -489,25 +651,55 @@ qualityButtons.forEach((button) => {
       return;
     }
 
-    currentSelection = {
-      rootName: currentSelection.rootName,
-      qualityKey,
-    };
-
+    currentSelection.qualityKey = qualityKey;
+    input.value = currentSymbol();
     input.focus();
-    syncChoiceControls();
+    render(input.value);
+  });
+});
+
+scaleButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const scaleKey = button.dataset.scale as ScaleKey | undefined;
+
+    if (!scaleKey || !SCALES[scaleKey]) {
+      return;
+    }
+
+    currentSelection.scaleKey = scaleKey;
+    input.value = currentSymbol();
+    input.focus();
+    render(input.value);
   });
 });
 
 grid.addEventListener("click", (event) => {
   const button = (event.target as Element).closest<HTMLButtonElement>("[data-play-action]");
 
-  if (!button || !activeParsedChord) {
+  if (!button) {
+    return;
+  }
+
+  const action = button.dataset.playAction;
+
+  if (action === "scale") {
+    const box = activeScaleBoxes.find((candidate) => candidate.id === button.dataset.boxId);
+
+    if (!box) {
+      return;
+    }
+
+    button.classList.add("is-playing");
+    window.setTimeout(() => button.classList.remove("is-playing"), 1300);
+    void playScaleBox(box);
+    return;
+  }
+
+  if (!activeParsedChord) {
     return;
   }
 
   const shape = activeShapes.find((candidate) => candidate.id === button.dataset.shapeId);
-  const action = button.dataset.playAction;
 
   if (!shape || (action !== "chord" && action !== "sequence")) {
     return;
@@ -522,12 +714,30 @@ historyRow.addEventListener("click", (event) => {
   const button = (event.target as Element).closest<HTMLButtonElement>("[data-history-chord]");
 
   if (button) {
-    const chord = button.dataset.historyChord ?? "";
-    input.value = chord;
+    currentSelection.mode = button.dataset.historyMode === "scale" ? "scale" : "chord";
+    const symbol = button.dataset.historyChord ?? "";
+    input.value = symbol;
     input.focus();
-    render(chord);
+    render(symbol);
   }
 });
+
+function setMode(mode: AppMode): void {
+  if (currentSelection.mode === mode) {
+    return;
+  }
+
+  currentSelection.mode = mode;
+  input.value = currentSymbol();
+  input.focus();
+  render(input.value);
+}
+
+function currentSymbol(): string {
+  return currentSelection.mode === "scale"
+    ? scaleSymbol(currentSelection.rootName, currentSelection.scaleKey)
+    : chordSymbol(currentSelection.rootName, currentSelection.qualityKey);
+}
 
 render(input.value);
 
@@ -542,6 +752,14 @@ function requireElement<T extends Element>(selector: string): T {
 }
 
 function render(rawSymbol: string): void {
+  if (currentSelection.mode === "scale") {
+    renderScale(rawSymbol);
+  } else {
+    renderChord(rawSymbol);
+  }
+}
+
+function renderChord(rawSymbol: string): void {
   const parsed = parseChord(rawSymbol);
 
   if (!parsed) {
@@ -557,10 +775,8 @@ function render(rawSymbol: string): void {
     return;
   }
 
-  currentSelection = {
-    rootName: parsed.rootName,
-    qualityKey: parsed.quality.key,
-  };
+  currentSelection.rootName = parsed.rootName;
+  currentSelection.qualityKey = parsed.quality.key;
 
   const shapes = getShapes(parsed);
   activeParsedChord = parsed;
@@ -573,17 +789,48 @@ function render(rawSymbol: string): void {
   message.hidden = true;
   message.textContent = "";
   syncChoiceControls();
-  updateHistory(parsed.displayName);
+  updateHistory(parsed.displayName, "chord");
   summary.innerHTML = renderSummary(parsed, notes);
   grid.innerHTML = shapes.map((shape) => renderShapeCard(parsed, shape)).join("");
 }
 
-function updateHistory(displayName: string): void {
-  chordHistory = [displayName, ...chordHistory.filter((chord) => chord !== displayName)].slice(0, 8);
-  historyRow.innerHTML = chordHistory
+function renderScale(rawSymbol: string): void {
+  const parsed = parseScale(rawSymbol);
+
+  if (!parsed) {
+    activeParsedScale = null;
+    activeScaleBoxes = [];
+    syncChoiceControls();
+    summary.innerHTML = "";
+    grid.innerHTML = "";
+    message.hidden = false;
+    message.textContent = rawSymbol.trim()
+      ? "Unsupported scale. Try A minor pentatonic, E blues, C major, or G minor."
+      : "Enter a scale, e.g. A minor pentatonic.";
+    return;
+  }
+
+  currentSelection.rootName = parsed.rootName;
+  currentSelection.scaleKey = parsed.scale.key;
+
+  const boxes = getScaleBoxes(parsed);
+  activeParsedScale = parsed;
+  activeScaleBoxes = boxes;
+
+  message.hidden = true;
+  message.textContent = "";
+  syncChoiceControls();
+  updateHistory(parsed.displayName, "scale");
+  summary.innerHTML = renderScaleSummary(parsed);
+  grid.innerHTML = boxes.map((box) => renderScaleCard(parsed, box)).join("");
+}
+
+function updateHistory(displayName: string, mode: AppMode): void {
+  history = [{ name: displayName, mode }, ...history.filter((entry) => entry.name !== displayName)].slice(0, 8);
+  historyRow.innerHTML = history
     .map(
-      (chord) =>
-        `<button type="button" class="history-chip" data-history-chord="${escapeHtml(chord)}">${escapeHtml(chord)}</button>`,
+      (entry) =>
+        `<button type="button" class="history-chip" data-history-chord="${escapeHtml(entry.name)}" data-history-mode="${entry.mode}">${escapeHtml(entry.name)}</button>`,
     )
     .join("");
 }
@@ -637,24 +884,83 @@ function chordSymbol(rootName: string, qualityKey: QualityKey): string {
   return `${rootName}${QUALITIES[qualityKey].suffix}`;
 }
 
+function scaleSymbol(rootName: string, scaleKey: ScaleKey): string {
+  return `${rootName} ${SCALES[scaleKey].suffix}`;
+}
+
+function parseScale(inputValue: string): ParsedScale | null {
+  const cleaned = inputValue.trim();
+  const match = cleaned.match(/^([A-Ga-g])([#b]?)(.*)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const rootName = `${match[1].toUpperCase()}${match[2] ?? ""}`;
+  const rootPc = NOTE_TO_PC[rootName];
+
+  if (rootPc === undefined) {
+    return null;
+  }
+
+  const scaleKey = parseScaleSuffix(match[3] ?? "");
+
+  if (!scaleKey) {
+    return null;
+  }
+
+  const scale = SCALES[scaleKey];
+
+  return {
+    rootName,
+    rootPc,
+    preferFlats: rootName.includes("b"),
+    scale,
+    displayName: scaleSymbol(rootName, scaleKey),
+  };
+}
+
+function parseScaleSuffix(rawSuffix: string): ScaleKey | null {
+  const suffix = rawSuffix.replace(/\s+/g, "").toLowerCase();
+  return SCALE_SUFFIXES.get(suffix) ?? null;
+}
+
 function syncChoiceControls(): void {
-  const committedSelectionMatches =
-    activeParsedChord?.rootName === currentSelection.rootName &&
-    activeParsedChord.quality.key === currentSelection.qualityKey;
+  const isScale = currentSelection.mode === "scale";
+
+  modeButtons.forEach((button) => {
+    const isActive = button.dataset.mode === currentSelection.mode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  inputLabel.textContent = isScale ? "Scale" : "Chord";
+  qualityPicker.hidden = isScale;
+  scalePicker.hidden = !isScale;
+
+  const committed = isScale
+    ? activeParsedScale?.rootName === currentSelection.rootName &&
+      activeParsedScale.scale.key === currentSelection.scaleKey
+    : activeParsedChord?.rootName === currentSelection.rootName &&
+      activeParsedChord.quality.key === currentSelection.qualityKey;
 
   rootButtons.forEach((button) => {
     const rootName = button.dataset.root ?? "";
-    const isActive = committedSelectionMatches && rootName === currentSelection.rootName;
+    const isActive = Boolean(committed) && rootName === currentSelection.rootName;
 
-    button.textContent = chordSymbol(rootName, currentSelection.qualityKey);
+    button.textContent = isScale ? rootName : chordSymbol(rootName, currentSelection.qualityKey);
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
 
   qualityButtons.forEach((button) => {
-    const qualityKey = button.dataset.quality as QualityKey | undefined;
-    const isActive = qualityKey === currentSelection.qualityKey;
+    const isActive = button.dataset.quality === currentSelection.qualityKey;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
 
+  scaleButtons.forEach((button) => {
+    const isActive = button.dataset.scale === currentSelection.scaleKey;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
@@ -662,7 +968,7 @@ function syncChoiceControls(): void {
 
 function renderSummary(parsed: ParsedChord, notes: Array<FormulaTone & { name: string }>): string {
   return `
-    ${renderChromaticMap(parsed)}
+    ${renderChromaticMap(parsed.quality.formula)}
     <div class="chord-title-row">
       <div>
         <p class="summary-label">Current chord</p>
@@ -695,19 +1001,19 @@ function renderSummary(parsed: ParsedChord, notes: Array<FormulaTone & { name: s
   `;
 }
 
-function renderChromaticMap(parsed: ParsedChord): string {
+function renderChromaticMap(formula: FormulaTone[]): string {
   return `
     <div class="interval-map">
       <p class="definition-label">Chromatic map</p>
       <div class="interval-map-grid">
-        ${CHROMATIC_INTERVAL_MAP.map((interval) => renderIntervalMapToken(parsed, interval)).join("")}
+        ${CHROMATIC_INTERVAL_MAP.map((interval) => renderIntervalMapToken(formula, interval)).join("")}
       </div>
     </div>
   `;
 }
 
-function renderIntervalMapToken(parsed: ParsedChord, interval: { semitone: number; label: string }): string {
-  const chordTone = parsed.quality.formula.find((tone) => tone.semitone === interval.semitone);
+function renderIntervalMapToken(formula: FormulaTone[], interval: { semitone: number; label: string }): string {
+  const chordTone = formula.find((tone) => tone.semitone === interval.semitone);
   const activeClass = chordTone ? ` is-active tone-${chordTone.role}` : "";
 
   return `
@@ -716,6 +1022,250 @@ function renderIntervalMapToken(parsed: ParsedChord, interval: { semitone: numbe
       <strong>${escapeHtml(interval.label)}</strong>
     </div>
   `;
+}
+
+function renderScaleSummary(parsed: ParsedScale): string {
+  const notes = parsed.scale.formula.map((tone) => ({
+    ...tone,
+    name: spellScaleTone(parsed, tone),
+  }));
+
+  return `
+    ${renderChromaticMap(parsed.scale.formula)}
+    <div class="chord-title-row">
+      <div>
+        <p class="summary-label">Current scale</p>
+        <h2>${escapeHtml(parsed.displayName)}</h2>
+      </div>
+      <span class="quality-pill">${escapeHtml(parsed.scale.name)}</span>
+    </div>
+    <div class="definition-panel" aria-label="${escapeHtml(parsed.displayName)} scale definition">
+      <div class="definition-row">
+        <span>Scale formula</span>
+        <strong>${parsed.scale.formula.map((tone) => tone.label).join(" ")}</strong>
+      </div>
+      <div class="definition-row">
+        <span>Step pattern</span>
+        <strong>${escapeHtml(parsed.scale.stepPattern)}</strong>
+      </div>
+      <div class="definition-row">
+        <span>Notes</span>
+        <strong>${notes.map((note) => escapeHtml(note.name)).join(" ")}</strong>
+      </div>
+    </div>
+    <div class="tone-table">
+      ${notes
+        .map(
+          (note) => `
+            <div class="tone-token tone-${note.role}">
+              <span>${escapeHtml(note.label)}</span>
+              <strong>${escapeHtml(note.name)}</strong>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function getScaleBoxes(parsed: ParsedScale): ScaleBox[] {
+  const lowEpc = OPEN_STRINGS[0].pc;
+  const rootFret = (parsed.rootPc - lowEpc + 12) % 12;
+  // Wider window for 7-note scales so each box shows a playable 3-notes-per-string region.
+  const span = parsed.scale.formula.length > 5 ? 5 : 4;
+  const anchors = new Set<number>();
+
+  // Anchor each box on a scale tone along the low E string, spanning octaves so the
+  // lowest playable positions are covered regardless of how high the root sits.
+  for (const octave of [-12, 0, 12]) {
+    for (const tone of parsed.scale.formula) {
+      anchors.add(rootFret + octave + tone.semitone);
+    }
+  }
+
+  return [...anchors]
+    .filter((start) => start >= 0 && start <= 12)
+    .sort((a, b) => a - b)
+    .slice(0, 5)
+    .map((start, index) => buildScaleBox(parsed, start, span, index));
+}
+
+function buildScaleBox(parsed: ParsedScale, start: number, span: number, index: number): ScaleBox {
+  const lo = start;
+  const hi = start + span - 1;
+  const notes: ScaleNote[] = [];
+
+  for (let stringIndex = 0; stringIndex < OPEN_STRINGS.length; stringIndex += 1) {
+    for (let fret = lo; fret <= hi; fret += 1) {
+      const pc = (OPEN_STRINGS[stringIndex].pc + fret) % 12;
+      const interval = (pc - parsed.rootPc + 12) % 12;
+      const tone = parsed.scale.formula.find((candidate) => candidate.semitone === interval);
+
+      if (!tone) {
+        continue;
+      }
+
+      notes.push({
+        stringIndex,
+        fret,
+        noteName: spellScaleTone(parsed, tone),
+        degree: tone.label,
+        role: tone.role,
+        midi: OPEN_STRINGS[stringIndex].midi + fret,
+      });
+    }
+  }
+
+  return {
+    id: `scale-${parsed.scale.key}-${parsed.rootPc}-${start}`,
+    name: `Position ${index + 1}`,
+    rangeLabel: lo === 0 ? `open · frets 0–${hi}` : `frets ${lo}–${hi}`,
+    baseFret: lo === 0 ? 1 : lo,
+    fretCount: span,
+    notes,
+  };
+}
+
+function renderScaleCard(parsed: ParsedScale, box: ScaleBox): string {
+  const svg = renderScaleDiagramSvg(parsed, box);
+
+  return `
+    <article class="shape-card">
+      <div class="shape-card-header">
+        <div>
+          <p class="shape-category">Scale position</p>
+          <h3>${escapeHtml(box.name)}</h3>
+        </div>
+        <div class="shape-tools">
+          <button type="button" class="icon-button" data-play-action="scale" data-box-id="${escapeHtml(
+            box.id,
+          )}" title="Play scale" aria-label="Play ${escapeHtml(parsed.displayName)} ${escapeHtml(box.name)} ascending">
+            ${sequenceIcon()}
+          </button>
+          <span class="fret-code">${escapeHtml(box.rangeLabel)}</span>
+        </div>
+      </div>
+      ${svg}
+    </article>
+  `;
+}
+
+function renderScaleDiagramSvg(parsed: ParsedScale, box: ScaleBox): string {
+  const width = 360;
+  const height = 230;
+  const left = 58;
+  const right = 330;
+  const top = 44;
+  const bottom = 184;
+  const { fretCount, baseFret } = box;
+  const fretGap = (right - left) / fretCount;
+  const stringGap = (bottom - top) / 5;
+  const fretLines = Array.from({ length: fretCount + 1 }, (_, index) => left + index * fretGap);
+  const stringYs = Array.from({ length: 6 }, (_, index) => top + index * stringGap);
+  const nutStroke = baseFret === 1 ? 8 : 2;
+  const baseLabel = baseFret === 1 ? "" : `<text class="fret-label" x="${left + 10}" y="24">${baseFret}fr</text>`;
+
+  return `
+    <svg class="chord-diagram" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(
+      `${parsed.displayName} ${box.name}`,
+    )}">
+      <rect class="diagram-bg" x="0" y="0" width="${width}" height="${height}" rx="8"></rect>
+      ${baseLabel}
+      ${fretLines
+        .map(
+          (x, index) =>
+            `<line class="${index === 0 && baseFret === 1 ? "nut-line" : "fret-line"}" x1="${x}" y1="${top}" x2="${x}" y2="${bottom}" stroke-width="${index === 0 ? nutStroke : 2}"></line>`,
+        )
+        .join("")}
+      ${stringYs.map((y) => `<line class="string-line" x1="${left}" y1="${y}" x2="${right}" y2="${y}"></line>`).join("")}
+      ${DISPLAY_STRING_ORDER.map(
+        (stringIndex, displayIndex) =>
+          `<text class="string-label" x="${left - 34}" y="${stringYs[displayIndex] + 5}">${6 - stringIndex} ${OPEN_STRINGS[stringIndex].name}</text>`,
+      ).join("")}
+      ${DISPLAY_STRING_ORDER.map((stringIndex, displayIndex) =>
+        renderScaleStringMarkers(box, stringIndex, left, stringYs[displayIndex], fretGap, baseFret),
+      ).join("")}
+    </svg>
+  `;
+}
+
+function renderScaleStringMarkers(
+  box: ScaleBox,
+  stringIndex: number,
+  left: number,
+  y: number,
+  fretGap: number,
+  baseFret: number,
+): string {
+  const stringNotes = box.notes.filter((note) => note.stringIndex === stringIndex);
+
+  if (stringNotes.length === 0) {
+    const openX = left - 22;
+
+    return `
+      <g class="muted-marker" aria-label="${OPEN_STRINGS[stringIndex].name} string has no scale tone in this position">
+        <line x1="${openX - 7}" y1="${y - 7}" x2="${openX + 7}" y2="${y + 7}"></line>
+        <line x1="${openX + 7}" y1="${y - 7}" x2="${openX - 7}" y2="${y + 7}"></line>
+      </g>
+    `;
+  }
+
+  return stringNotes.map((note) => renderScaleMarker(note, left, y, fretGap, baseFret)).join("");
+}
+
+function renderScaleMarker(note: ScaleNote, left: number, y: number, fretGap: number, baseFret: number): string {
+  const markerClass = `note-marker marker-${note.role}`;
+
+  if (note.fret === 0) {
+    const openX = left - 22;
+
+    return `
+      <g class="open-marker ${markerClass}" aria-label="${OPEN_STRINGS[note.stringIndex].name} open ${escapeHtml(
+        note.noteName,
+      )} ${escapeHtml(note.degree)}">
+        <circle cx="${openX}" cy="${y}" r="13"></circle>
+        ${renderMarkerText(openX, y, note.noteName, note.degree)}
+      </g>
+    `;
+  }
+
+  const x = left + (note.fret - baseFret + 0.5) * fretGap;
+
+  return `
+    <g class="${markerClass}" aria-label="${OPEN_STRINGS[note.stringIndex].name} string fret ${note.fret} ${escapeHtml(
+      note.noteName,
+    )} ${escapeHtml(note.degree)}">
+      <circle cx="${x}" cy="${y}" r="13"></circle>
+      ${renderMarkerText(x, y, note.noteName, note.degree)}
+    </g>
+  `;
+}
+
+async function playScaleBox(box: ScaleBox): Promise<void> {
+  const engine = getAudioEngine();
+  const { context } = engine;
+
+  if (context.state === "suspended") {
+    await context.resume();
+  }
+
+  const seen = new Set<number>();
+  const ordered = [...box.notes]
+    .sort((a, b) => a.midi - b.midi)
+    .filter((note) => {
+      if (seen.has(note.midi)) {
+        return false;
+      }
+
+      seen.add(note.midi);
+      return true;
+    });
+  const now = context.currentTime + 0.025;
+
+  ordered.forEach((note, index) => {
+    const pan = ((note.stringIndex - 2.5) / 2.5) * 0.28;
+    playPluckedNote(context, engine.output, midiToFrequency(note.midi), now + index * 0.16, 0.26, pan);
+  });
 }
 
 function getShapes(parsed: ParsedChord): ChordShape[] {
@@ -1291,11 +1841,18 @@ function intervalLabelForDefinition(tone: FormulaTone): string {
 }
 
 function spellChordTone(parsed: ParsedChord, tone: FormulaTone): string {
-  const degree = degreeForTone(tone);
-  const rootLetter = parsed.rootName[0];
+  return spellTone(parsed.rootName, parsed.rootPc, tone.semitone, degreeForTone(tone));
+}
+
+function spellScaleTone(parsed: ParsedScale, tone: FormulaTone): string {
+  return spellTone(parsed.rootName, parsed.rootPc, tone.semitone, degreeForTone(tone));
+}
+
+function spellTone(rootName: string, rootPc: number, semitone: number, degree: number): string {
+  const rootLetter = rootName[0];
   const rootLetterIndex = LETTERS.indexOf(rootLetter);
   const targetLetter = LETTERS[(rootLetterIndex + degree - 1) % LETTERS.length];
-  const targetPc = (parsed.rootPc + tone.semitone) % 12;
+  const targetPc = (rootPc + semitone) % 12;
   const naturalPc = LETTER_TO_NATURAL_PC[targetLetter];
   const accidentalDistance = normalizeAccidentalDistance(targetPc - naturalPc);
 
