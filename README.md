@@ -22,3 +22,7 @@ npm run build
 ```
 
 Then open `dist/index.html` directly in a browser. The build inlines its CSS and JavaScript into that single file, so it can run from `file://` with no server.
+
+## Deploy
+
+Every push to `main` builds the app and publishes `dist/` to the `gh-pages` branch, which is what https://kolov.github.io/ChordLens/ serves. See `.github/workflows/deploy.yml`; it can also be run manually from the Actions tab.
