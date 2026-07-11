@@ -197,6 +197,12 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* `display: grid` above outranks the UA `[hidden]` rule, so the hidden
+   panel would still show. Re-assert none for the inactive mode's grid. */
+.quality-grid[hidden] {
+  display: none;
+}
+
 .root-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
